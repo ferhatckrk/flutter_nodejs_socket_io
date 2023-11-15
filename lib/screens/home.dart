@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_socket_io/data/data.dart';
 import 'package:flutter_socket_io/model/message.dart';
 import 'package:flutter_socket_io/providers/home.dart';
+import 'package:flutter_socket_io/socket/socket_client.dart';
 import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:provider/provider.dart';
@@ -18,13 +18,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late IO.Socket _socket;
   final TextEditingController _messageInputController = TextEditingController();
-
+  bool isWriting = false;
   _sendMessage() {
-    _socket.emit('message', {
+    _socket.emit('message-${Data.roomID}', {
       'message': _messageInputController.text.trim(),
-      'sender': widget.username
+      'sender': Data.userName
     });
     _messageInputController.clear();
+  }
+
+  _firstOpen() {
+    _socket.emit("firstLogin-${Data.roomID}", {"name": "Ferhat  Çıkrık"});
   }
 
   _connectSocket() {
@@ -32,23 +36,36 @@ class _HomeScreenState extends State<HomeScreen> {
     _socket.onConnectError((data) => print('Connect Error: $data'));
     _socket.onDisconnect((data) => print('Socket.IO server disconnected'));
     _socket.on(
-      'message',
+      'message-${Data.roomID}',
       (data) => Provider.of<HomeProvider>(context, listen: false).addNewMessage(
         Message.fromJson(data),
       ),
     );
+    _socket.on('firstLogin-${Data.roomID}', (data) {
+      print(data);
+    });
+    _socket.on('writing-${Data.roomID}', (data) {
+      var name = data["name"];
+      bool value = data["value"];
+      setState(() {
+        if (name != Data.userName) {
+          isWriting = value;
+        }
+      });
+    });
+  }
+
+  _writingEvent(bool value) {
+    _socket.emit("writing-${Data.roomID}", {"name": Data.userName, "value": value});
   }
 
   @override
   void initState() {
     super.initState();
     //Important: If your server is running on localhost and you are testing your app on Android then replace http://localhost:3000 with http://10.0.2.2:3000
-    _socket = IO.io(
-      Platform.isIOS ? 'http://localhost:3000' : 'http://10.0.2.2:3000',
-      IO.OptionBuilder().setTransports(['websocket']).setQuery(
-          {'username': widget.username}).build(),
-    );
+    _socket = SocketClient.instance.socket!;
     _connectSocket();
+    _firstOpen();
   }
 
   @override
@@ -59,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print("object");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Flutter Socket.IO'),
@@ -72,12 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemBuilder: (context, index) {
                   final message = provider.messages[index];
                   return Wrap(
-                    alignment: message.senderUsername == widget.username
+                    alignment: message.senderUsername == Data.userName
                         ? WrapAlignment.end
                         : WrapAlignment.start,
                     children: [
                       Card(
-                        color: message.senderUsername == widget.username
+                        color: message.senderUsername == Data.userName
                             ? Theme.of(context).primaryColorLight
                             : Colors.white,
                         child: Padding(
@@ -85,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment:
-                                message.senderUsername == widget.username
+                                message.senderUsername == Data.userName
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
                             children: [
@@ -108,6 +126,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (isWriting)
+            const Align(
+              alignment: Alignment.bottomLeft,
+              child: Icon(
+                Icons.more_horiz,
+                color: Colors.amber,
+                size: 50,
+              ),
+            ),
           Container(
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
@@ -121,6 +148,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: TextField(
                       controller: _messageInputController,
+                      onChanged: (value) async {
+                        _writingEvent(true);
+                        await Future.delayed(const Duration(seconds: 2));
+                        _writingEvent(false);
+                      },
+                      onEditingComplete: () {
+                        print("onEditingComplete");
+
+                        _writingEvent(false);
+                      },
                       decoration: const InputDecoration(
                         hintText: 'Type your message here...',
                         border: InputBorder.none,

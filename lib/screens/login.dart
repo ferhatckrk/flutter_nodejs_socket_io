@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_socket_io/data/data.dart';
 import 'package:flutter_socket_io/providers/home.dart';
 import 'package:flutter_socket_io/providers/login.dart';
 import 'package:flutter_socket_io/screens/home.dart';
@@ -13,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _roomIDController = TextEditingController();
 
   @override
   void dispose() {
@@ -21,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   _login() {
+    Data.userName = _usernameController.text;
+    Data.roomID = _roomIDController.text;
     final provider = Provider.of<LoginProvider>(context, listen: false);
     if (_usernameController.text.trim().isNotEmpty) {
       provider.setErrorMessage('');
@@ -83,6 +87,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   labelText: 'Who are you?',
+                ),
+              ),
+              const SizedBox(
+                height: 40,
+              ),
+              TextField(
+                controller: _roomIDController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Enter Room ID',
                 ),
               ),
               const SizedBox(
